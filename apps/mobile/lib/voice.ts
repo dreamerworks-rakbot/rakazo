@@ -252,13 +252,29 @@ async function speakPrepared(text: string, opts: SpeechOptions, epoch: number): 
       { status: "playing", botId: opts.botId, messageId: opts.messageId, canPause: true },
       control,
     );
+    const utterances = prepared.utterances;
+    // Render the next clip while the current one plays, so its network round trip overlaps
+    // the audio instead of following it. A prefetch can be left unawaited when playback
+    // stops, so its failure rides along as a value until the loop reaches that sentence.
+    type Rendered = { audio: Uint8Array; error?: never } | { audio?: never; error: unknown };
+    const render = (text: string): Promise<Rendered> =>
+      renderUtterance(text, opts, requestContext).then(
+        (audio) => ({ audio }),
+        (error: unknown) => ({ error }),
+      );
     let finished = false;
     try {
-      for (const utterance of prepared.utterances) {
+      let next: Promise<Rendered> | null =
+        utterances.length > 0 ? render(utterances[0] ?? "") : null;
+      for (let i = 0; i < utterances.length; i += 1) {
         if (session.isStopped || !isCurrentSpeech(epoch)) break;
-        const audio = await renderUtterance(utterance, opts, requestContext);
+        const current = next;
+        next = i + 1 < utterances.length ? render(utterances[i + 1] ?? "") : null;
+        if (!current) break;
+        const rendered = await current;
+        if ("error" in rendered) throw rendered.error;
         if (session.isStopped || !isCurrentSpeech(epoch)) break;
-        await playMpeg(audio, session);
+        await playMpeg(rendered.audio, session);
       }
       finished = !session.isStopped && isCurrentSpeech(epoch);
     } finally {
