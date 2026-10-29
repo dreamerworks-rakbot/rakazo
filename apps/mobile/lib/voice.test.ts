@@ -322,8 +322,6 @@ describe("hosted voice playback controls", () => {
     const firstAudio = ControllableAudio.instances[0]!;
     await waitFor(() => firstAudio.paused === false);
 
-    // The second sentence is synthesized while the first one plays, so its audio is
-    // already in hand when the first clip ends instead of a round trip later.
     await waitFor(() => requested.length === 2);
     expect(requested).toEqual(["First", "Second"]);
     expect(ControllableAudio.instances).toHaveLength(1);
@@ -361,12 +359,9 @@ describe("hosted voice playback controls", () => {
       await waitFor(() => ControllableAudio.instances.length === 1);
       const firstAudio = ControllableAudio.instances[0]!;
       await waitFor(() => firstAudio.paused === false);
-      // The failing sentence was already asked for; the clip now playing is untouched.
       await waitFor(() => calls === 2);
       expect(ControllableAudio.instances).toHaveLength(1);
 
-      // Nothing is awaiting the failed prefetch yet and the clip keeps playing: over a
-      // real event-loop turn its failure must not surface as an unhandled rejection.
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(unhandled).toEqual([]);
 

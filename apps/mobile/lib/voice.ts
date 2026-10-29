@@ -253,9 +253,7 @@ async function speakPrepared(text: string, opts: SpeechOptions, epoch: number): 
       control,
     );
     const utterances = prepared.utterances;
-    // Render the next clip while the current one plays, so its network round trip overlaps
-    // the audio instead of following it. A prefetch can be left unawaited when playback
-    // stops, so its failure rides along as a value until the loop reaches that sentence.
+    // Render one clip ahead; failures ride as values so an abandoned prefetch never rejects unhandled.
     type Rendered = { audio: Uint8Array; error?: never } | { audio?: never; error: unknown };
     const render = (text: string): Promise<Rendered> =>
       renderUtterance(text, opts, requestContext).then(
